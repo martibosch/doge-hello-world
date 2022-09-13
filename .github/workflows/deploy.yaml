@@ -1,0 +1,243 @@
+name: deploy
+
+# Enable Buildkit and let compose use it to speed up image building
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+on:
+  push:
+    branches: [ "stage", "main" ]
+    paths-ignore: [ "docs/**" ]
+
+
+jobs:
+  inform-about-apply:
+    name: inform about apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: inform on PR that apply is running
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            ***Running terraform apply***
+            Results will display here momentarily...
+
+  extract-branch:
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.extract_branch.outputs.branch }}
+    steps:
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "::set-output name=branch::$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+  
+  plan-and-apply-stage:
+    needs: extract-branch
+    environment: stage
+    runs-on: ubuntu-latest
+    if: ${{ needs.extract-branch.outputs.branch == 'stage' }}
+    strategy:
+      fail-fast: false
+    steps:        
+      - name: checkout code repository
+        uses: actions/checkout@v3
+
+      - name: install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_KEY }}
+          name: id_rsa # optional
+          known_hosts: unnecessary
+          if_key_exists: fail # replace / ignore / fail; optional (defaults to fail)
+
+      - name: add known hosts
+        run: ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+        
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.2.2
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: initialize terraform
+        run: |
+          make init-stage TF_FLAGS="-input=false"
+
+      - name: plan terraform
+        id: plan
+        continue-on-error: true
+        run: |
+          make plan-stage TF_FLAGS="-input=false -no-color"
+
+      - name: apply terraform
+        if: steps.plan.outcome == 'success'
+        id: apply
+        continue-on-error: true
+        run: |
+          make apply-stage TF_FLAGS="-auto-approve -input=false -no-color"
+
+      - name: post plan and apply to github PR
+        if: steps.plan.outcome == 'success' && steps.apply.outcome == 'success'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Applying **stage**:
+            ```diff
+            ${{ env.PLAN }}
+            ```
+            ```
+            ${{ steps.apply.outputs.stdout }}
+            ```
+
+      - name: add plan failure to PR
+        if: steps.plan.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Plan failed for **stage**:
+            ```
+            ${{ steps.plan.outputs.stderr }}
+            ```
+
+      - name: fail if plan fails
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: add apply failure to PR
+        if: steps.apply.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Apply failed for **stage**:
+            ```
+            ${{ steps.apply.outputs.stderr }}
+            ```
+
+      - name: fail if apply fails
+        if: steps.apply.outcome == 'failure'
+        run: exit 1
+
+      - name: deploy with rsync
+        run: rsync -avz ./app ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:~
+
+      - name: docker compose up
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: docker-compose -f app/compose.yml up --build -d
+
+  plan-and-apply-prod:
+    needs: extract-branch
+    environment: prod
+    runs-on: ubuntu-latest
+    if: ${{ needs.extract-branch.outputs.branch == 'main' }}
+    strategy:
+      fail-fast: false
+    steps:
+      - name: checkout code repository
+        uses: actions/checkout@v3
+
+      - name: install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_KEY }}
+          name: id_rsa # optional
+          known_hosts: unnecessary
+          if_key_exists: fail # replace / ignore / fail; optional (defaults to fail)
+
+      - name: add known hosts
+        run: ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.2.2
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: initialize terraform
+        run: |
+          make init-prod
+
+      - name: plan terraform
+        id: plan
+        continue-on-error: true
+        run: |
+          make plan-prod TF_FLAGS="-input=false -no-color"
+
+      - name: apply terraform
+        if: steps.plan.outcome == 'success'
+        id: apply
+        continue-on-error: true
+        run: |
+          make apply-prod TF_FLAGS="-auto-approve -input=false -no-color"
+
+      - name: post plan and apply to github PR
+        if: steps.plan.outcome == 'success' && steps.apply.outcome == 'success'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Applying **prod**:
+            ```diff
+            ${{ env.PLAN }}
+            ```
+            ```
+            ${{ steps.apply.outputs.stdout }}
+            ```
+
+      - name: add plan failure to PR
+        if: steps.plan.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Plan failed for **prod**:
+            ```
+            ${{ steps.plan.outputs.stderr }}
+            ```
+
+      - name: fail if plan fails
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: add apply failure to PR
+        if: steps.apply.outcome == 'failure'
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Apply failed for **prod**:
+            ```
+            ${{ steps.apply.outputs.stderr }}
+            ```
+
+      - name: fail if apply fails
+        if: steps.apply.outcome == 'failure'
+        run: exit 1
+
+      - name: deploy with rsync
+        run: rsync -avz ./app ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:~
+
+      - name: docker compose up
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: docker-compose -f app/compose.yml up --build -d
