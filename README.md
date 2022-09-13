@@ -1,7 +1,7 @@
 # Doge Hello World
 
-[![ci](https://github.com/martibosch/doge-hello-world/actions/workflows/ci.yml/badge.svg)](https://github.com/martibosch/doge-hello-world/actions/workflows/ci.yml)
-[![deploy](https://github.com/martibosch/doge-hello-world/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/martibosch/doge-hello-world/actions/workflows/deploy.yml?query=branch%3Amain)
+[![ci](https://github.com/martibosch/doge-hello-world/actions/workflows/ci.yaml/badge.svg)](https://github.com/martibosch/doge-hello-world/actions/workflows/ci.yaml)
+[![deploy](https://github.com/martibosch/doge-hello-world/actions/workflows/deploy.yaml/badge.svg?branch=main)](https://github.com/martibosch/doge-hello-world/actions/workflows/deploy.yaml?query=branch%3Amain)
 [![GitHub license](https://img.shields.io/github/license/martibosch/doge-hello-world.svg)](https://github.com/martibosch/doge-hello-world/blob/main/LICENSE)
 [![Built with Doge](https://img.shields.io/badge/built%20with-Doge-orange)](https://github.com/martibosch/cookiecutter-doge)
 
