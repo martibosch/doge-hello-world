@@ -58,7 +58,7 @@ jobs:
           make plan-stage TF_FLAGS="-input=false -no-color"
 
       - name: post plan to github PR
-        uses: mshick/add-pr-comment@v1
+        uses: mshick/add-pr-comment@v2
         with:
           allow-repeats: true
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -115,7 +115,7 @@ jobs:
           make plan-prod TF_FLAGS="-input=false -no-color"
 
       - name: post plan to github PR
-        uses: mshick/add-pr-comment@v1
+        uses: mshick/add-pr-comment@v2
         with:
           allow-repeats: true
           repo-token: ${{ secrets.GITHUB_TOKEN }}
