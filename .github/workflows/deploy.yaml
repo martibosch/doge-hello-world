@@ -45,7 +45,7 @@ jobs:
       fail-fast: false
     steps:        
       - name: checkout code repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install SSH key
         uses: shimataro/ssh-key-action@v2
@@ -148,7 +148,7 @@ jobs:
       fail-fast: false
     steps:
       - name: checkout code repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install SSH key
         uses: shimataro/ssh-key-action@v2
