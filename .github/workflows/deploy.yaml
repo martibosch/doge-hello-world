@@ -59,7 +59,7 @@ jobs:
         run: ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
         
       - name: setup terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.2.2
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -162,7 +162,7 @@ jobs:
         run: ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
 
       - name: setup terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.2.2
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
